@@ -3,85 +3,616 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Decider agent demo</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<title>ResQGrid AI — Emergency Coordination</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0B1020; --panel:#121A2E; --line:#223052; --ink:#E7ECF6; --mute:#8D9AB5; --orange:#FF9900; --green:#34D399; --red:#F87171; --amber:#FBBF24; --blue:#60A5FA; }
-  * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px Inter, system-ui, sans-serif; }
-  header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--line); }
-  header .dot { width:10px; height:10px; border-radius:50%; background:var(--orange); box-shadow:0 0 12px var(--orange); }
-  header h1 { font-size:18px; margin:0; } header .meta { color:var(--mute); font-size:13px; margin-left:auto; }
-  main { display:grid; grid-template-columns:1.1fr 1fr; gap:18px; padding:18px 22px; height:calc(100vh - 60px); }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; display:flex; flex-direction:column; min-height:0; }
-  .card h2 { margin:0 0 10px; font-size:14px; color:var(--mute); text-transform:uppercase; letter-spacing:.08em; }
-  #log { flex:1; overflow:auto; display:flex; flex-direction:column; gap:10px; }
-  .msg { padding:10px 13px; border-radius:12px; max-width:88%; line-height:1.45; white-space:pre-wrap; }
-  .user { align-self:flex-end; background:#1E2A47; } .bot { align-self:flex-start; background:#18243B; border:1px solid var(--line); }
-  .bot .t { color:var(--mute); font-size:12px; margin-top:6px; }
-  form { display:flex; gap:10px; margin-top:12px; } input { flex:1; background:#0F1628; color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:12px; font:inherit; }
-  button { background:var(--orange); color:#111; border:0; border-radius:10px; padding:0 18px; font-weight:700; cursor:pointer; }
-  #dec { flex:1; overflow:auto; display:flex; flex-direction:column; gap:12px; }
-  .d { border:1px solid var(--line); border-radius:12px; padding:12px; background:#0F1628; animation:pop .35s ease; }
-  @keyframes pop { from { transform:scale(.97); opacity:.2; } to { transform:none; opacity:1; } }
-  .d .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-weight:700; }
-  .tag { font:12px 'JetBrains Mono', monospace; padding:2px 9px; border-radius:99px; border:1px solid var(--line); }
-  .proceed { color:var(--green); border-color:var(--green); } .guide, .review { color:var(--amber); border-color:var(--amber); }
-  .deny, .block { color:var(--red); border-color:var(--red); } .confirm { color:var(--blue); border-color:var(--blue); }
-  .row { display:grid; grid-template-columns:150px 1fr 54px; gap:10px; align-items:center; font:13px 'JetBrains Mono', monospace; margin:5px 0; }
-  .bar { height:10px; background:#1B2540; border-radius:99px; overflow:hidden; } .bar i { display:block; height:100%; border-radius:99px; }
-  .kv { color:var(--mute); font:12px 'JetBrains Mono', monospace; margin-top:6px; word-break:break-all; }
-  .empty { color:var(--mute); } .credit { color:var(--mute); font-size:12px; margin-top:8px; }
-  .clip { display:flex; align-items:center; padding:0 12px; border:1px solid var(--line); border-radius:10px; cursor:pointer; font-size:18px; }
-  .att { display:flex; gap:8px; margin-top:10px; } .att img, .msg img { height:64px; border-radius:8px; border:1px solid var(--line); }
-  .msg img { height:120px; display:block; margin-bottom:6px; }
+/* ── design tokens ───────────────────────────────────────────────── */
+:root {
+  --bg:        #07090F;
+  --surface:   #0D1117;
+  --panel:     #111827;
+  --card:      #161D2B;
+  --border:    #1F2D45;
+  --border2:   #253450;
+  --ink:       #E2E8F6;
+  --ink2:      #A8B5CC;
+  --mute:      #5A6B85;
+  --red:       #FF4444;
+  --red-dim:   #7F1919;
+  --amber:     #F59E0B;
+  --amber-dim: #78460A;
+  --green:     #22C55E;
+  --green-dim: #14532D;
+  --blue:      #3B82F6;
+  --blue-dim:  #1E3A6E;
+  --cyan:      #06B6D4;
+  --orange:    #F97316;
+  --orange-glow: rgba(249,115,22,.35);
+  --radius:    14px;
+  --radius-sm: 9px;
+}
+
+/* ── reset ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; overflow: hidden; }
+::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+/* ── layout ──────────────────────────────────────────────────────── */
+#app { display: grid; grid-template-rows: 58px 1fr; height: 100vh; }
+
+/* ── header ──────────────────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative; z-index: 10;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(135deg, #FF4444 0%, #F97316 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(255,68,68,.4);
+}
+.logo-text { font-weight: 700; font-size: 16px; }
+.logo-text span { color: var(--orange); }
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 99px; padding: 4px 12px;
+  font-size: 12px; color: var(--ink2);
+}
+.pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.6); } 50% { box-shadow: 0 0 0 5px rgba(34,197,94,0); } }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.meta-badge {
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  color: var(--mute); background: var(--card);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 9px; white-space: nowrap;
+}
+#dec-count-badge {
+  background: var(--red); color: #fff; font-size: 11px; font-weight: 700;
+  border-radius: 99px; padding: 1px 7px; display: none;
+}
+
+/* ── body grid ───────────────────────────────────────────────────── */
+.body { display: grid; grid-template-columns: 1fr 400px; gap: 0; height: 100%; overflow: hidden; }
+
+/* ── chat column ─────────────────────────────────────────────────── */
+.chat-col { display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface); }
+
+/* incident banner -------------------------------------------------- */
+#incident-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--ink2);
+  flex-wrap: wrap;
+  min-height: 42px;
+}
+#incident-bar .inc-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--panel); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 3px 9px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; cursor: pointer;
+  transition: border-color .15s;
+}
+#incident-bar .inc-chip:hover { border-color: var(--orange); }
+.inc-chip .sev { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sev-critical { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.sev-serious  { background: var(--amber); }
+.sev-moderate { background: var(--blue); }
+.sev-minor    { background: var(--green); }
+#incident-bar .label { color: var(--mute); margin-right: 4px; }
+
+/* message list ----------------------------------------------------- */
+#log { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+
+/* messages */
+.msg { max-width: 82%; display: flex; flex-direction: column; gap: 4px; animation: fadeup .22s ease; }
+@keyframes fadeup { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg.user { align-self: flex-end; }
+.msg.bot  { align-self: flex-start; }
+
+.msg-bubble {
+  padding: 11px 14px; border-radius: var(--radius);
+  line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+}
+.user .msg-bubble { background: linear-gradient(135deg, #1A3060, #0F2050); border: 1px solid #2A4580; border-bottom-right-radius: 4px; }
+.bot  .msg-bubble { background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+
+.msg-meta { font-size: 11px; color: var(--mute); padding: 0 4px; display: flex; align-items: center; gap: 8px; }
+.msg-meta .decision-link { color: var(--orange); cursor: pointer; text-decoration: none; font-size: 11px; }
+.msg-meta .decision-link:hover { text-decoration: underline; }
+
+.msg img { max-height: 130px; border-radius: 9px; border: 1px solid var(--border); display: block; margin-bottom: 6px; }
+
+/* typing indicator */
+.typing-dots { display: flex; gap: 4px; align-items: center; padding: 14px 16px; }
+.typing-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); animation: blink 1.2s infinite; }
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }
+
+/* quick actions ---------------------------------------------------- */
+#quick-actions {
+  display: flex; gap: 8px; padding: 10px 18px;
+  flex-wrap: wrap; border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.qa-btn {
+  font-size: 12px; font-family: Inter, sans-serif; color: var(--ink2);
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: 99px; padding: 5px 13px; cursor: pointer;
+  transition: all .15s; white-space: nowrap; line-height: 1;
+}
+.qa-btn:hover { border-color: var(--orange); color: var(--orange); background: rgba(249,115,22,.08); }
+
+/* compose area ----------------------------------------------------- */
+#compose {
+  display: flex; align-items: flex-end; gap: 10px;
+  padding: 12px 18px 14px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+#att-preview { display: flex; gap: 8px; padding: 0 18px 6px; }
+#att-preview img { height: 52px; border-radius: 7px; border: 1px solid var(--border); }
+#att-preview .rm { position: relative; }
+#att-preview .rm button { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); border: 0; color: #fff; font-size: 10px; cursor: pointer; line-height: 1; display: flex; align-items: center; justify-content: center; }
+#msg-input {
+  flex: 1; background: var(--card); color: var(--ink);
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  padding: 11px 14px; font: inherit; font-size: 14px;
+  resize: none; max-height: 120px; outline: none;
+  transition: border-color .15s;
+  field-sizing: content;
+  min-height: 44px;
+}
+#msg-input:focus { border-color: var(--orange); }
+#msg-input::placeholder { color: var(--mute); }
+.compose-btns { display: flex; gap: 8px; }
+.icon-btn {
+  width: 44px; height: 44px; border-radius: var(--radius-sm);
+  background: var(--card); border: 1px solid var(--border2);
+  color: var(--ink2); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; transition: all .15s; flex-shrink: 0;
+}
+.icon-btn:hover { border-color: var(--border); color: var(--ink); }
+#send-btn {
+  width: 44px; height: 44px; border-radius: var(--radius-sm);
+  background: var(--orange); border: 0; color: #fff;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0; transition: opacity .15s;
+  box-shadow: 0 0 14px var(--orange-glow);
+}
+#send-btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+#send-btn:not(:disabled):hover { opacity: .85; }
+
+/* ── decisions column ────────────────────────────────────────────── */
+.dec-col {
+  display: flex; flex-direction: column; background: var(--bg); overflow: hidden;
+}
+
+.dec-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px 10px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dec-header h2 { font-size: 12px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: .08em; }
+#clear-btn { font-size: 11px; color: var(--mute); background: none; border: 0; cursor: pointer; padding: 4px 8px; border-radius: 5px; }
+#clear-btn:hover { background: var(--card); color: var(--ink2); }
+
+/* stats strip */
+#stats-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.stat { padding: 8px 10px; text-align: center; border-right: 1px solid var(--border); }
+.stat:last-child { border-right: 0; }
+.stat .n { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.stat .l { font-size: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+.n-proceed { color: var(--green); }
+.n-confirm { color: var(--blue); }
+.n-deny    { color: var(--red); }
+.n-total   { color: var(--orange); }
+
+#dec-list { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+/* empty state */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--mute); text-align: center; gap: 10px; padding: 30px;
+}
+.empty-icon { font-size: 40px; opacity: .4; }
+.empty-state p { font-size: 13px; line-height: 1.6; max-width: 240px; }
+
+/* decision card */
+.dec-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  animation: slidedown .25s ease;
+}
+@keyframes slidedown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.dec-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 13px 7px; border-bottom: 1px solid var(--border);
+}
+.dec-tool { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--ink2); }
+.dec-tool span { color: var(--orange); }
+.verdict-pill {
+  font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+  padding: 3px 10px; border-radius: 99px; border: 1px solid; text-transform: uppercase; letter-spacing: .04em;
+}
+.verdict-proceed { color: var(--green); border-color: var(--green); background: rgba(34,197,94,.1); }
+.verdict-confirm { color: var(--blue);  border-color: var(--blue);  background: rgba(59,130,246,.1); }
+.verdict-deny    { color: var(--red);   border-color: var(--red);   background: rgba(255,68,68,.1); }
+.verdict-guide   { color: var(--amber); border-color: var(--amber); background: rgba(245,158,11,.1); }
+.verdict-block   { color: var(--red);   border-color: var(--red);   background: rgba(255,68,68,.1); }
+
+.dec-body { padding: 10px 13px; display: flex; flex-direction: column; gap: 7px; }
+
+/* classification chips */
+.class-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+.class-chip {
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  padding: 3px 9px; border-radius: 6px; border: 1px solid var(--border2);
+  background: var(--panel); color: var(--ink2);
+  display: flex; align-items: center; gap: 5px;
+}
+.class-chip .conf { color: var(--mute); }
+
+/* probability bars */
+.prob-row { display: grid; grid-template-columns: 130px 1fr 42px; gap: 8px; align-items: center; }
+.prob-label { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prob-bar { height: 8px; background: var(--panel); border-radius: 99px; overflow: hidden; }
+.prob-fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.prob-value { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--ink2); text-align: right; }
+
+/* dec meta footer */
+.dec-foot { padding: 7px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.dec-foot-left { font-size: 11px; color: var(--mute); font-family: 'JetBrains Mono', monospace; }
+.dec-foot-args { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+
+/* ── footer ──────────────────────────────────────────────────────── */
+footer {
+  grid-column: 1/-1; text-align: center; font-size: 11px; color: var(--mute);
+  padding: 6px; border-top: 1px solid var(--border); background: var(--surface);
+}
+footer a { color: var(--mute); text-decoration: none; }
+footer a:hover { color: var(--ink2); }
+
+/* ── responsive ──────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .body { grid-template-columns: 1fr; }
+  .dec-col { display: none; }
+}
 </style>
 </head>
 <body>
-<header><span class="dot"></span><h1 id="name">Decider agent</h1><span class="meta" id="meta"></span></header>
-<main>
-  <section class="card"><h2>Conversation</h2><div id="log"></div>
-    <div id="att" class="att"></div>
-    <form id="f"><label class="clip" title="Attach a photo">&#128206;<input id="img" type="file" accept="image/*" multiple hidden></label><input id="m" placeholder="Type a message" autocomplete="off"><button>Send</button></form></section>
-  <section class="card"><h2>Strands Decider 2B decisions</h2><div id="dec"><p class="empty">Decisions appear here as the agent makes them.</p></div>
-    <div class="credit">Built with the AWS User Group Madurai Strands Decider hackathon kit</div></section>
-</main>
+<div id="app">
+
+  <!-- ── header ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🚨</div>
+      <div class="logo-text">ResQGrid <span>AI</span></div>
+    </div>
+    <div class="status-pill"><span class="pulse"></span><span id="status-text">Connecting…</span></div>
+    <div class="header-right">
+      <span class="meta-badge" id="llm-badge">LLM: —</span>
+      <span class="meta-badge" id="dec-badge">Decider: —</span>
+      <span id="dec-count-badge">0</span>
+    </div>
+  </header>
+
+  <!-- ── body ── -->
+  <div class="body">
+
+    <!-- chat column -->
+    <div class="chat-col">
+
+      <!-- active incidents bar -->
+      <div id="incident-bar">
+        <span class="label">Active:</span>
+        <span class="inc-chip" onclick="fillMsg('What is the status of incident INC-001?')"><span class="sev sev-critical"></span>INC-001 Fire</span>
+        <span class="inc-chip" onclick="fillMsg('What is the status of incident INC-002?')"><span class="sev sev-serious"></span>INC-002 Medical</span>
+        <span class="inc-chip" onclick="fillMsg('What is the status of incident INC-003?')"><span class="sev sev-serious"></span>INC-003 Hazmat</span>
+        <span class="inc-chip" onclick="fillMsg('What is the status of incident INC-004?')"><span class="sev sev-moderate"></span>INC-004 SAR</span>
+        <span class="inc-chip" onclick="fillMsg('What is the status of incident INC-005?')"><span class="sev sev-moderate"></span>INC-005 Infra</span>
+        <span class="inc-chip" onclick="fillMsg('What is the status of incident INC-006?')"><span class="sev sev-minor"></span>INC-006 Medical</span>
+      </div>
+
+      <!-- messages -->
+      <div id="log">
+        <div class="msg bot">
+          <div class="msg-bubble">👋 Welcome to <strong>ResQGrid AI</strong> — your emergency coordination assistant.<br><br>
+I can help you:<br>
+• 📋 Look up active incident reports<br>
+• 🚒 Check available first-responder resources<br>
+• 📡 Dispatch units (with AI policy check before every dispatch)<br>
+• 📝 Log incident status updates<br><br>
+Try clicking an incident chip above, or type a request like:<br>
+<em>"Dispatch 2 fire engines to INC-001"</em></div>
+          <div class="msg-meta">ResQGrid AI · ready</div>
+        </div>
+      </div>
+
+      <!-- quick actions -->
+      <div id="quick-actions">
+        <button class="qa-btn" onclick="fillMsg('Check available fire engines')">🚒 Check fire engines</button>
+        <button class="qa-btn" onclick="fillMsg('Check available ambulances')">🚑 Check ambulances</button>
+        <button class="qa-btn" onclick="fillMsg('Dispatch 2 fire engines to INC-001')">⚡ Dispatch → INC-001</button>
+        <button class="qa-btn" onclick="fillMsg('Log INC-002 status as contained. All casualties transported.')">📝 Update INC-002</button>
+        <button class="qa-btn" onclick="fillMsg('What resources are available for a hazmat response?')">☣️ Hazmat resources</button>
+      </div>
+
+      <!-- attachment preview -->
+      <div id="att-preview"></div>
+
+      <!-- compose -->
+      <div id="compose">
+        <label class="icon-btn" title="Attach incident photo">
+          📎<input id="img-input" type="file" accept="image/*" multiple hidden>
+        </label>
+        <textarea id="msg-input" rows="1" placeholder="Describe the incident or request a dispatch…" autocomplete="off"></textarea>
+        <button id="send-btn" title="Send" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- decisions column -->
+    <div class="dec-col">
+      <div class="dec-header">
+        <h2>⚖️ Strands Decider 2B</h2>
+        <button id="clear-btn" onclick="clearDecisions()">Clear</button>
+      </div>
+
+      <!-- stats -->
+      <div id="stats-strip">
+        <div class="stat"><div class="n n-proceed" id="cnt-proceed">0</div><div class="l">Proceed</div></div>
+        <div class="stat"><div class="n n-confirm" id="cnt-confirm">0</div><div class="l">Confirm</div></div>
+        <div class="stat"><div class="n n-deny"    id="cnt-deny">0</div><div class="l">Denied</div></div>
+        <div class="stat"><div class="n n-total"   id="cnt-total">0</div><div class="l">Total</div></div>
+      </div>
+
+      <!-- decision list -->
+      <div id="dec-list">
+        <div class="empty-state" id="dec-empty">
+          <div class="empty-icon">🛡️</div>
+          <p>Decisions appear here when the agent calls <code>dispatch_resources</code>.<br><br>Try dispatching units to an active incident.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /body -->
+
+  <footer>Built with the <a href="https://www.awsugmdu.in" target="_blank">AWS User Group Madurai</a> Strands Decider hackathon kit &nbsp;·&nbsp; ResQGrid AI &nbsp;·&nbsp; Apache-2.0</footer>
+</div>
+
 <script>
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const log = document.getElementById("log"), dec = document.getElementById("dec");
-fetch("/api/info").then(r => r.json()).then(i => { document.getElementById("name").textContent = i.agent;
-  document.getElementById("meta").textContent = `LLM: ${i.llm} · Decider: ${i.decider} · ${i.target === "agentcore" ? "on AgentCore Runtime" : "local agent"}`; });
-function add(cls, html) { const d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html; log.appendChild(d); log.scrollTop = 1e9; return d; }
-function decision(rec) {
-  if (dec.querySelector(".empty")) dec.innerHTML = "";
-  const verdict = rec.verdict || rec.action || rec.tier || "";
-  const title = rec.tool ? `before ${rec.tool}` : (rec.stage || rec.pattern || "decision");
-  const probs = Object.entries(rec).filter(([k, v]) => typeof v === "number" && v >= 0 && v <= 1 && !k.endsWith("_ms"));
-  const rest = Object.entries(rec).filter(([k, v]) => !(typeof v === "number" && v >= 0 && v <= 1) && !["verdict", "action", "tool", "stage", "pattern"].includes(k));
-  const color = (v) => v >= 0.5 ? "#34D399" : "#F87171";
-  const el = document.createElement("div"); el.className = "d";
-  el.innerHTML = `<div class="head"><span>${esc(title)} <span class="tag">${esc(rec.pattern || "")}</span></span><span class="tag ${esc(verdict)}">${esc(verdict)}</span></div>` +
-    probs.map(([k, v]) => `<div class="row"><span>${esc(k)}</span><span class="bar"><i style="width:${v * 100}%;background:${color(v)}"></i></span><span>${v.toFixed(2)}</span></div>`).join("") +
-    `<div class="kv">${rest.map(([k, v]) => `${esc(k)}: ${esc(typeof v === "object" ? JSON.stringify(v) : v)}`).join(" · ")}</div>`;
-  dec.prepend(el);
+/* ── utilities ──────────────────────────────────────────────────── */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = id => document.getElementById(id);
+
+/* ── state ──────────────────────────────────────────────────────── */
+let pending = [];   // attached images (data URLs)
+let counts = { proceed: 0, confirm: 0, deny: 0, guide: 0, block: 0 };
+
+/* ── on load ─────────────────────────────────────────────────────── */
+fetch("/api/info").then(r => r.json()).then(info => {
+  $("status-text").textContent = "Online";
+  $("llm-badge").textContent = "LLM: " + (info.llm || "—");
+  $("dec-badge").textContent  = "Decider: " + (info.decider || "—");
+}).catch(() => {
+  $("status-text").textContent = "Offline";
+  $("status-text").style.color = "var(--red)";
+  document.querySelector(".pulse").style.background = "var(--red)";
+});
+
+/* ── input helpers ───────────────────────────────────────────────── */
+const input = $("msg-input");
+const sendBtn = $("send-btn");
+
+input.addEventListener("input", () => {
+  sendBtn.disabled = !input.value.trim() && !pending.length;
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 120) + "px";
+});
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+});
+
+function fillMsg(text) {
+  input.value = text;
+  input.dispatchEvent(new Event("input"));
+  input.focus();
 }
-let pending = [];  // attached photos as data URLs, sent with the next message
-const att = document.getElementById("att");
-document.getElementById("img").addEventListener("change", async (e) => {
-  for (const f of e.target.files) pending.push(await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); }));
-  att.innerHTML = pending.map((u) => `<img src="${u}" alt="attached photo">`).join(""); e.target.value = "";
+
+/* ── image attachment ────────────────────────────────────────────── */
+$("img-input").addEventListener("change", async e => {
+  for (const f of e.target.files) {
+    pending.push(await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); }));
+  }
+  renderAttachments();
+  sendBtn.disabled = false;
+  e.target.value = "";
 });
-document.getElementById("f").addEventListener("submit", async (e) => {
-  e.preventDefault(); const m = document.getElementById("m"); const text = m.value.trim(); if (!text && !pending.length) return; m.value = "";
-  const images = pending; pending = []; att.innerHTML = "";
-  add("user", images.map((u) => `<img src="${u}" alt="photo">`).join("") + esc(text)); const wait = add("bot", "<span class='t'>thinking...</span>");
-  const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: text || "(photo)", images }) });
-  const out = await r.json();
-  if (out.error) { wait.innerHTML = `<span style="color:#F87171">${esc(out.error)}</span>`; return; }
-  (out.decisions || []).forEach(decision);
-  const n = (out.decisions || []).length;
-  wait.innerHTML = esc(out.reply) + `<div class="t">${out.latency_ms} ms · ${n} decision${n === 1 ? "" : "s"}${out.served_by ? " · " + esc(out.served_by) : ""}</div>`;
-  document.body.dataset.turns = (+(document.body.dataset.turns || 0) + 1);
+
+function renderAttachments() {
+  const el = $("att-preview");
+  el.innerHTML = pending.map((u, i) =>
+    `<div class="rm"><img src="${esc(u)}" alt="attached"><button onclick="removeAttachment(${i})">✕</button></div>`
+  ).join("");
+}
+function removeAttachment(i) {
+  pending.splice(i, 1); renderAttachments();
+  if (!pending.length && !input.value.trim()) sendBtn.disabled = true;
+}
+
+/* ── chat messages ───────────────────────────────────────────────── */
+function addMsg(cls, html, meta) {
+  const el = document.createElement("div");
+  el.className = "msg " + cls;
+  el.innerHTML = `<div class="msg-bubble">${html}</div>` +
+    (meta ? `<div class="msg-meta">${meta}</div>` : "");
+  $("log").appendChild(el);
+  $("log").scrollTop = 1e9;
+  return el;
+}
+
+function showTyping() {
+  const el = document.createElement("div");
+  el.className = "msg bot"; el.id = "typing";
+  el.innerHTML = '<div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  $("log").appendChild(el);
+  $("log").scrollTop = 1e9;
+  return el;
+}
+
+/* ── send ────────────────────────────────────────────────────────── */
+$("send-btn").addEventListener("click", async () => {
+  const text = input.value.trim();
+  if (!text && !pending.length) return;
+
+  const images = [...pending];
+  pending = []; renderAttachments();
+  input.value = ""; input.style.height = "auto"; sendBtn.disabled = true;
+
+  // user bubble
+  const imgHtml = images.map(u => `<img src="${esc(u)}" alt="photo">`).join("");
+  addMsg("user", imgHtml + esc(text));
+
+  // typing indicator
+  const typingEl = showTyping();
+
+  let out;
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: text || "(photo)", images }),
+    });
+    out = await res.json();
+  } catch (err) {
+    typingEl.remove();
+    addMsg("bot", `<span style="color:var(--red)">⚠️ Connection error: ${esc(String(err))}</span>`);
+    return;
+  }
+  typingEl.remove();
+
+  if (out.error) {
+    addMsg("bot", `<span style="color:var(--red)">⚠️ ${esc(out.error)}</span>`);
+    return;
+  }
+
+  // render decisions first so we can link them
+  const decIds = (out.decisions || []).map((d, i) => renderDecision(d, i));
+  const n = decIds.length;
+
+  const decLink = n > 0
+    ? `<a class="decision-link" onclick="scrollToDecision('${decIds[0]}')">⚖️ ${n} decision${n>1?"s":""}</a>`
+    : "";
+  const metaParts = [
+    out.latency_ms ? `${out.latency_ms} ms` : null,
+    out.model_id   ? esc(out.model_id.split(".").pop()) : null,
+    decLink,
+  ].filter(Boolean).join(" · ");
+
+  addMsg("bot", esc(out.reply), metaParts);
 });
+
+/* ── decisions ───────────────────────────────────────────────────── */
+function renderDecision(rec, idx) {
+  const id = "dec-" + Date.now() + "-" + idx;
+  $("dec-empty")?.remove();
+
+  const verdict = rec.verdict || rec.action || rec.tier || "unknown";
+  const toolName = rec.tool || rec.stage || "decision";
+
+  // classification chips (non-numeric, non-boilerplate fields)
+  const skipKeys = new Set(["verdict","action","tool","stage","pattern","reason","args","decider_ms"]);
+  const classFields = Object.entries(rec).filter(([k,v]) => typeof v === "string" && !skipKeys.has(k));
+  const confKeys = classFields.map(([k]) => k + "_conf");
+  const confMap = Object.fromEntries(confKeys.map(k => [k, rec[k]]));
+
+  const classHtml = classFields.length
+    ? `<div class="class-row">${classFields.map(([k,v]) => {
+        const conf = rec[k + "_conf"] != null ? `<span class="conf">${(rec[k+"_conf"]*100).toFixed(0)}%</span>` : "";
+        return `<span class="class-chip">🏷 <strong>${esc(v)}</strong>${conf}</span>`;
+      }).join("")}</div>` : "";
+
+  // probability bars
+  const probSkip = new Set([...skipKeys, ...classFields.map(([k])=>k), ...confKeys.map(k=>k)]);
+  const probs = Object.entries(rec).filter(([k,v]) => typeof v === "number" && v >= 0 && v <= 1 && !k.endsWith("_ms") && !k.endsWith("_conf") && !probSkip.has(k));
+
+  function barColor(v) {
+    if (v >= 0.7) return "#22C55E";
+    if (v >= 0.4) return "#F59E0B";
+    return "#F87171";
+  }
+
+  const probHtml = probs.map(([k,v]) => `
+    <div class="prob-row">
+      <span class="prob-label" title="${esc(k)}">${esc(k)}</span>
+      <div class="prob-bar"><div class="prob-fill" style="width:${v*100}%;background:${barColor(v)}"></div></div>
+      <span class="prob-value">${v.toFixed(2)}</span>
+    </div>`).join("");
+
+  const argsStr = rec.args ? JSON.stringify(rec.args) : "";
+  const ms = rec.decider_ms != null ? `${rec.decider_ms} ms` : "";
+
+  const el = document.createElement("div");
+  el.className = "dec-card"; el.id = id;
+  el.innerHTML = `
+    <div class="dec-card-head">
+      <span class="dec-tool">⚡ <span>${esc(toolName)}</span></span>
+      <span class="verdict-pill verdict-${esc(verdict)}">${esc(verdict)}</span>
+    </div>
+    <div class="dec-body">
+      ${classHtml}
+      ${probHtml}
+    </div>
+    <div class="dec-foot">
+      <span class="dec-foot-left">${esc(ms)}</span>
+      <span class="dec-foot-args" title="${esc(argsStr)}">${esc(argsStr)}</span>
+    </div>`;
+
+  $("dec-list").prepend(el);
+
+  // update stats
+  const key = verdict === "guide" ? "guide" : (counts[verdict] != null ? verdict : "proceed");
+  counts[key] = (counts[key] || 0) + 1;
+  $("cnt-proceed").textContent = (counts.proceed || 0);
+  $("cnt-confirm").textContent = (counts.confirm || 0);
+  $("cnt-deny").textContent    = (counts.deny || 0) + (counts.block || 0);
+  $("cnt-total").textContent   = Object.values(counts).reduce((a,b)=>a+b,0);
+
+  // badge
+  const badge = $("dec-count-badge");
+  badge.style.display = "inline";
+  badge.textContent = $("cnt-total").textContent;
+
+  return id;
+}
+
+function scrollToDecision(id) {
+  const el = $(id);
+  if (el) { el.scrollIntoView({ behavior: "smooth", block: "nearest" }); el.style.outline = "2px solid var(--orange)"; setTimeout(() => el.style.outline = "", 1200); }
+}
+
+function clearDecisions() {
+  $("dec-list").innerHTML = `<div class="empty-state" id="dec-empty"><div class="empty-icon">🛡️</div><p>Decisions appear here when the agent calls <code>dispatch_resources</code>.</p></div>`;
+  counts = { proceed:0, confirm:0, deny:0, guide:0, block:0 };
+  ["cnt-proceed","cnt-confirm","cnt-deny","cnt-total"].forEach(id => $(id).textContent = "0");
+  $("dec-count-badge").style.display = "none";
+}
 </script>
 </body>
 </html>
