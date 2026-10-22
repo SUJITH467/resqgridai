@@ -1,0 +1,25 @@
+# ResQGrid AI demo script.
+# Each turn is typed into the demo UI against your real agent.
+# `narrate` describes the situation only; make_video.py appends what the decider actually decided,
+# so the narration never claims something that did not happen.
+title: "ResQGrid AI: an emergency coordination agent that classifies incidents before dispatching"
+pitch: "An emergency coordination agent that classifies incidents and cannot dispatch the wrong resources without human approval."
+features:
+  - "look up live incident reports, check resources and log updates through chat"
+  - "classify every dispatch with Strands Decider 2B: incident type, severity, justification"
+  - "pause ambiguous or low-severity dispatches for human confirmation"
+  - "run on Amazon Bedrock AgentCore Runtime"
+# eager: true makes the agent act without asking, so the decider has mistakes to catch on camera.
+eager: true
+intro: "ResQGrid AI is an emergency coordination agent. For this demo it is told to act without asking, and Strands Decider 2B checks every resource dispatch before it runs."
+intro_normal: "ResQGrid AI runs on Amazon Bedrock AgentCore Runtime. Strands Decider 2B classifies each incident and checks whether dispatch is justified before any unit is sent."
+turns:
+  - say: "Dispatch two ambulances to the highway pile-up."
+    narrate: "The coordinator wants to dispatch but has not looked up the incident or checked resources yet."
+  - say: "Check incident INC-002 and then dispatch four ambulances."
+    narrate: "Now the incident is confirmed and details are in the conversation."
+  - say: "Can you pre-position two fire engines near Sector 7 just in case?"
+    narrate: "This is a precautionary request with no confirmed incident."
+  - say: "Wildfire is confirmed at the edge of Sector 7, multiple structures threatened. Dispatch three fire engines immediately."
+    narrate: "A critical confirmed incident with a clear resource request."
+outro: "One forward pass per classification, typed probabilities the code can branch on, and Amazon Bedrock for the conversation and recommendations."

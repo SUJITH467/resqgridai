@@ -1,0 +1,17 @@
+# Amazon Bedrock AgentCore features for ResQGrid AI.
+# `./kit deploy` adds what is enabled to deploy/agentcore/agentcore.json and deploys it.
+
+memory:                    # AgentCore Memory: remember active incidents and dispatcher preferences across sessions.
+  enabled: true
+  name: resqgridmemory     # runtime env var MEMORY_RESQGRIDMEMORY_ID
+  strategies: [SEMANTIC, SUMMARIZATION]   # recall relevant incidents; summarise long shifts
+  expiry_days: 7           # incident history: keep for one week
+
+gateway:                   # AgentCore Gateway: additional tools behind one MCP endpoint.
+  enabled: false           # enable when connecting to a real CAD (Computer-Aided Dispatch) system
+  name: tools
+  authorizer: AWS_IAM
+  targets:
+    - name: websearch
+      type: connector
+      connector: web-search   # for real-time weather, road, or hazard information
