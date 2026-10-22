@@ -144,7 +144,24 @@ class IncidentDispatchGuard(InterventionHandler):
         )
 
         # Ask all three questions in one forward pass.
-        a = self.decider.ask(state, QUESTIONS)
+        # If the decider is unreachable, log the error and require human confirmation
+        # rather than silently allowing or denying the dispatch.
+        try:
+            a = self.decider.ask(state, QUESTIONS)
+        except Exception as exc:  # noqa: BLE001
+            err_rec = {
+                "pattern": PATTERN_TAG,
+                "tool": name,
+                "args": args,
+                "verdict": "confirm",
+                "reason": f"Decider unavailable ({type(exc).__name__}): {exc}. Human confirmation required.",
+            }
+            self.log.append(err_rec)
+            return Confirm(
+                prompt=f"⚠️ Decider unavailable — cannot auto-classify this dispatch. "
+                       f"Proposed: {json.dumps(args)}. Approve? (yes/no)",
+                response="yes",
+            )
 
         itype = a["incident_type"].label or "other"
         sev   = a["severity"].label or "minor"
